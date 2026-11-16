@@ -1,0 +1,10 @@
+import { beforeEach, expect, it, vi } from 'vitest';
+const db=vi.hoisted(()=>({user:{findUniqueOrThrow:vi.fn(),updateMany:vi.fn()}}));
+vi.mock('./access.js',()=>({prisma:db}));
+import { requestAccess } from './access-request.js';
+beforeEach(()=>vi.resetAllMocks());
+const response=()=>({status:vi.fn().mockReturnThis(),json:vi.fn()});
+it('records an explicit request from an unsubscribed user',async()=>{db.user.findUniqueOrThrow.mockResolvedValue({id:'user',role:'USER',subscription:null,isBanned:false,accessRequestStatus:null});const res=response();await requestAccess({user:{id:'user'}} as any,res as any,()=>{});expect(db.user.updateMany.mock.calls[0][0].data.accessRequestStatus).toBe('PENDING');expect(res.json).toHaveBeenCalledWith({status:'PENDING'})});
+it('does not create repeated pending requests',async()=>{db.user.findUniqueOrThrow.mockResolvedValue({id:'user',role:'USER',subscription:null,isBanned:false,accessRequestStatus:'PENDING'});const res=response();await requestAccess({user:{id:'user'}} as any,res as any,()=>{});expect(db.user.updateMany).not.toHaveBeenCalled();expect(res.json).toHaveBeenCalledWith({status:'PENDING'})});
+it('refuses requests from banned users',async()=>{db.user.findUniqueOrThrow.mockResolvedValue({id:'user',role:'USER',isBanned:true});const res=response();await requestAccess({user:{id:'user'}} as any,res as any,()=>{});expect(res.status).toHaveBeenCalledWith(403);expect(db.user.updateMany).not.toHaveBeenCalled()});
+it('does not count administrators as prospective subscribers',async()=>{db.user.findUniqueOrThrow.mockResolvedValue({id:'owner',role:'OWNER',isBanned:false});const res=response();await requestAccess({user:{id:'owner'}} as any,res as any,()=>{});expect(res.status).toHaveBeenCalledWith(409);expect(db.user.updateMany).not.toHaveBeenCalled()});

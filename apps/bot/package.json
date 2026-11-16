@@ -1,0 +1,1 @@
+{"name":"@hisobly/bot","private":true,"type":"module","scripts":{"dev":"tsx watch src/index.ts","build":"tsc --noEmit"},"dependencies":{"@prisma/client":"^6.5.0","dotenv":"^16.5.0","grammy":"^1.36.1"},"devDependencies":{"tsx":"^4.19.3","typescript":"^5.8.2"}}

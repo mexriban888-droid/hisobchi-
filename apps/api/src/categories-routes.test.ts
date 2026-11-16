@@ -1,0 +1,25 @@
+import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import express from 'express';
+import { createServer } from 'node:http';
+const db=vi.hoisted(()=>({category:{findMany:vi.fn(),findFirst:vi.fn(),create:vi.fn(),update:vi.fn(),deleteMany:vi.fn()},transaction:{groupBy:vi.fn(),findMany:vi.fn(),findFirst:vi.fn()},$transaction:vi.fn()}));
+vi.mock('./access.js',()=>({prisma:db,requireUser:(req:any,res:any,next:any)=>{if(!req.headers['x-test-user'])return res.status(401).end();req.user={id:req.headers['x-test-user']};next()},requireActive:(_req:any,_res:any,next:any)=>next()}));
+import router,{categoryName} from './categories-routes.js';
+const id='c123456789012345678901234';
+const app=express();app.use(express.json());app.set('json replacer',(_key:string,value:unknown)=>typeof value==='bigint'?String(value):value);app.use('/categories',router);app.use((_e:unknown,_req:any,res:any,_next:any)=>res.status(400).json({error:'VALIDATION_ERROR'}));
+const server=createServer(app);let base='';
+beforeAll(async()=>{await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));base=`http://127.0.0.1:${(server.address() as any).port}/categories`});
+afterAll(async()=>{await new Promise<void>(resolve=>server.close(()=>resolve()))});
+beforeEach(()=>{vi.resetAllMocks();db.$transaction.mockImplementation(fn=>fn(db))});
+const request=(path='',method='GET',body?:unknown,user='user-a')=>fetch(base+path,{method,headers:{'content-type':'application/json',...(user?{'x-test-user':user}:{})},body:body?JSON.stringify(body):undefined});
+describe('Private category routes',()=>{
+  it('rejects unauthenticated calls before accessing the DB',async()=>{const r=await request('/summary','GET',undefined,'');expect(r.status).toBe(401);expect(db.$transaction).not.toHaveBeenCalled()});
+  it('normalizes names and rejects empty or long names',()=>{expect(categoryName.parse('  Дом   и семья  ')).toBe('Дом и семья');expect(()=>categoryName.parse('   ')).toThrow();expect(()=>categoryName.parse('x'.repeat(61))).toThrow()});
+  it('creates exactly one private category',async()=>{db.category.findFirst.mockResolvedValue(null);db.category.create.mockResolvedValue({id,name:'Транспорт'});const r=await request('','POST',{name:' Транспорт '});expect(r.status).toBe(201);expect(db.category.create).toHaveBeenCalledWith({data:{userId:'user-a',name:'Транспорт'}})});
+  it('returns a friendly conflict for an existing case-insensitive name',async()=>{db.category.findFirst.mockResolvedValue({id,name:'Дом'});const r=await request('','POST',{name:'дом'});expect(r.status).toBe(409);expect((await r.json()).error).toBe('CATEGORY_EXISTS');expect(db.category.create).not.toHaveBeenCalled()});
+  it('does not rename a category owned by another account',async()=>{db.category.findFirst.mockResolvedValue(null);const r=await request('/'+id,'PATCH',{name:'Новое'});expect(r.status).toBe(404);expect(db.category.findFirst).toHaveBeenCalledWith({where:{id,userId:'user-a'}});expect(db.category.update).not.toHaveBeenCalled()});
+  it('updates category name without rewriting transaction snapshots',async()=>{db.category.findFirst.mockResolvedValueOnce({id}).mockResolvedValueOnce(null);db.category.update.mockResolvedValue({id,name:'Продукты'});const r=await request('/'+id,'PATCH',{name:'Продукты'});expect(r.status).toBe(200);expect(db.category.update).toHaveBeenCalledWith({where:{id},data:{name:'Продукты'}})});
+  it('deletes only a category scoped to the caller',async()=>{db.category.deleteMany.mockResolvedValue({count:1});const r=await request('/'+id,'DELETE');expect(r.status).toBe(204);expect(db.category.deleteMany).toHaveBeenCalledWith({where:{id,userId:'user-a'}})});
+  it('computes sums and an uncategorized group from all private expenses',async()=>{db.category.findMany.mockResolvedValue([{id,name:'Дом'}]);db.transaction.groupBy.mockResolvedValue([{categoryId:id,_sum:{amountUzs:75000n,amountUsdSnapshot:{toString:()=> '6'}},_count:{_all:3}},{categoryId:null,_sum:{amountUzs:25000n,amountUsdSnapshot:{toString:()=> '2'}},_count:{_all:1}}]);const r=await request('/summary');const data=await r.json();expect(data.totalExpenseUzs).toBe('100000');expect(data.items[0].sharePercent).toBe('75.0');expect(data.items[1].name).toBe('Без категории');expect(db.transaction.groupBy.mock.calls[0][0].where).toEqual({userId:'user-a',type:'EXPENSE'})});
+  it('paginates without skipping the first item on the next page',async()=>{db.category.findFirst.mockResolvedValue({id});db.transaction.findMany.mockResolvedValue([{id:'first'},{id:'second'},{id:'third'}]);const r=await request('/'+id+'/transactions?limit=2');const data=await r.json();expect(data.items).toHaveLength(2);expect(data.nextCursor).toBe('second');expect(db.transaction.findMany.mock.calls[0][0].where).toEqual({userId:'user-a',categoryId:id,type:'EXPENSE'})});
+  it('does not expose another user cursor',async()=>{db.category.findFirst.mockResolvedValue({id});db.transaction.findFirst.mockResolvedValue(null);const r=await request('/'+id+'/transactions?cursor='+id);expect(r.status).toBe(400);expect(db.transaction.findMany).not.toHaveBeenCalled()});
+});

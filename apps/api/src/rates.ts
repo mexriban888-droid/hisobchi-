@@ -1,0 +1,2 @@
+import { prisma } from './access.js';
+export async function rateFor(date: Date) { const rate=await prisma.exchangeRate.findFirst({where:{currencyCode:'USD',rateDate:{lte:date}},orderBy:{rateDate:'desc'}}); if(rate) return {rate, fallback:rate.rateDate.toISOString().slice(0,10)!==date.toISOString().slice(0,10)}; const fallbackRate=Number(process.env.DEFAULT_USD_RATE||12700); const created=await prisma.exchangeRate.create({data:{currencyCode:'USD',rateDate:date,rateUzsPerUsd:fallbackRate,source:'LOCAL_FALLBACK'}}); return {rate:created, fallback:true}; }

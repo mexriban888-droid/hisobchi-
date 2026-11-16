@@ -1,0 +1,8 @@
+{
+  "name": "hisobly",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/*"],
+  "scripts": {"dev": "concurrently \"npm run dev -w @hisobly/api\" \"npm run dev -w @hisobly/web\" \"npm run dev -w @hisobly/bot\"", "build": "npm run build -ws", "test": "npm run test -w @hisobly/api", "db:generate": "prisma generate", "db:migrate": "prisma migrate dev"},
+  "devDependencies": {"concurrently": "^9.1.2", "prisma": "^6.5.0", "typescript": "^5.8.2"}
+}

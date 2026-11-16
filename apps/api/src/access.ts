@@ -1,0 +1,8 @@
+import type { RequestHandler } from 'express'; import { PrismaClient, Role } from '@prisma/client';
+export const prisma = new PrismaClient();
+declare global { namespace Express { interface Request { user?: { id:string; role:Role; telegramId: bigint; isBanned?:boolean } } } }
+export const requireUser: RequestHandler = async (req,res,next) => { const id=req.signedCookies.hisobly_uid; if(!id) return res.status(401).json({error:'Unauthorized'}); const user=await prisma.user.findUnique({where:{id}}); if(!user) return res.status(401).json({error:'Unauthorized'}); req.user={id:user.id,role:user.role,telegramId:user.telegramId,isBanned:user.isBanned}; next(); };
+export const requireActive: RequestHandler = async (req,res,next) => { if(!req.user) return res.status(401).end(); const u=await prisma.user.findUnique({where:{id:req.user.id},include:{subscription:true}}); if (u?.isBanned) return res.status(403).json({error:'BANNED'}); // Administrators must be able to open the protected panel and their own account without buying a user subscription.
+ if (u?.role === Role.ADMIN || u?.role === Role.OWNER) return next(); const active=!!u?.subscription && !u.isBanned && !u.subscription.revokedAt && u.subscription.endsAt > new Date(); if(!active) return res.status(403).json({error:'SUBSCRIPTION_REQUIRED'}); next(); };
+export const requireAdmin: RequestHandler = (req,res,next) => !req.user || req.user.isBanned || (req.user.role !== Role.ADMIN && req.user.role !== Role.OWNER) ? res.status(403).json({error:'ADMIN_REQUIRED'}) : next();
+export const requireOwner: RequestHandler = (req,res,next) => !req.user || req.user.isBanned || req.user.role !== Role.OWNER ? res.status(403).json({error:'OWNER_REQUIRED'}) : next();
