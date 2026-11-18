@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { createServer } from 'node:http';
 import { config } from 'dotenv';
 import { readFileSync } from 'node:fs';
 import { Bot, InlineKeyboard, Keyboard } from 'grammy';
@@ -8,6 +9,8 @@ const token=process.env.BOT_TOKEN,url=process.env.WEB_APP_URL||'https://existed-
 if(!token)throw Error('BOT_TOKEN is required');
 const ownerId=process.env.OWNER_TELEGRAM_ID||JSON.parse(readFileSync(new URL('../runtime/owner.json',import.meta.url),'utf8')).telegramId;
 const bot=new Bot(token);
+const healthPort=Number(process.env.PORT||10000);
+createServer((req,res)=>{if(req.url==='/health'){res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({ok:true}));return}res.writeHead(404);res.end();}).listen(healthPort,()=>console.log(`Hisobchi bot health on :${healthPort}`));
 const menuButton={type:'web_app' as const,text:'Hisobchi',web_app:{url}};
 const keyboard=()=>new InlineKeyboard().webApp('Открыть Hisobchi',url);
 const launchKeyboard=()=>new Keyboard().webApp('🚀 Hisobchi ni ochish',url).resized().persistent();
