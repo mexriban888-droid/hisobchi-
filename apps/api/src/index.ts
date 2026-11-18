@@ -5,7 +5,7 @@ import { requestAccess } from './access-request.js';
 import { profilePhoto } from './profile-photo.js';
 import { aggregateDays, timelineRange } from './timeline.js';
 const required=(name:string)=>{const value=process.env[name];if(!value)throw new Error(`${name} is required`);return value};
-const app=express(); const port=Number(process.env.API_PORT||3000); const sessionSecret=required('SESSION_SECRET'); const botToken=required('BOT_TOKEN'); const ownerId=process.env.OWNER_TELEGRAM_ID||JSON.parse(readFileSync(new URL('../../bot/runtime/owner.json',import.meta.url),'utf8')).telegramId;
+const app=express(); const port=Number(process.env.PORT||process.env.API_PORT||3000); const sessionSecret=required('SESSION_SECRET'); const botToken=required('BOT_TOKEN'); const ownerId=process.env.OWNER_TELEGRAM_ID||JSON.parse(readFileSync(new URL('../../bot/runtime/owner.json',import.meta.url),'utf8')).telegramId;
 // Prisma returns BigInt values for UZS amounts. Convert them at the HTTP boundary
 // instead of allowing JSON.stringify to crash otherwise valid requests.
 app.set('json replacer', (_key:string, value:unknown) => typeof value === 'bigint' ? value.toString() : value);
