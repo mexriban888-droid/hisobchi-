@@ -3,3 +3,8 @@
 :root[data-theme=dark] header>.round{display:none} :root[data-theme=light] header>.round{display:none}
 :root[data-theme=dark] header{display:none} :root[data-theme=dark] .balance{border:0;border-radius:0;padding:8px 0;background:#000} :root[data-theme=dark] .cards article,:root[data-theme=dark] .chart,:root[data-theme=dark] .metric,:root[data-theme=dark] .profile,:root[data-theme=dark] .row{border:0;border-radius:0}
 :root header{display:none}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+main{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
+nav{padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+.sheet{padding-bottom:calc(30px + env(safe-area-inset-bottom,0px));max-height:100dvh;overflow-y:auto}
+@media(max-width:600px){input,select,textarea{font-size:16px!important}}
